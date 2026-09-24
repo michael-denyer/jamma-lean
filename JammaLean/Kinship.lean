@@ -33,6 +33,7 @@ variable {n : Type*} [Fintype n] [DecidableEq n] {p : ℕ}
 noncomputable def kinship (X : Matrix n (Fin p) ℝ) : Matrix n n ℝ :=
   (1 / (p : ℝ)) • (X * Xᵀ)
 
+set_option linter.unusedFintypeInType false in
 omit [DecidableEq n] in
 /-- The kinship matrix is positive semidefinite. -/
 theorem kinship_posSemidef (X : Matrix n (Fin p) ℝ) : (kinship X).PosSemidef := by

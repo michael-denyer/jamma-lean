@@ -24,6 +24,11 @@ import JammaLean
 #print axioms JammaLean.gaussLogL_at_argmax
 #print axioms JammaLean.gaussLogL_argmax_unique
 #print axioms JammaLean.logdetKernel_eq_sum_log
+#print axioms JammaLean.prod_pab_diag_eq_det_gram
+#print axioms JammaLean.sum_log_pab_diag_eq_log_det_gram
+#print axioms JammaLean.gram_weighted_rot_eq
+#print axioms JammaLean.gram_rot_eq
+#print axioms JammaLean.logdet_hiw_eq
 
 -- `abIndex` is computable: the packed slots for n_cvt = 1 (cols = 3), in the
 -- order `build_index_table` walks them.

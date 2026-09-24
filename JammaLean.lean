@@ -11,3 +11,4 @@ import JammaLean.GramDet
 import JammaLean.ClosedForm
 import JammaLean.FpSum
 import JammaLean.Optimizer
+import JammaLean.FpSumTree

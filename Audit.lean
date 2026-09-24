@@ -79,3 +79,15 @@ import JammaLean
 #print axioms JammaLean.accepted_closer_of_same_side
 #print axioms JammaLean.newtonLoop_affine
 #print axioms JammaLean.refine_can_leave_golden_bracket
+#print axioms JammaLean.STree.err_le_pow
+#print axioms JammaLean.STree.err_le_fpGamma
+#print axioms JammaLean.STree.err_le_fpGamma_length
+#print axioms JammaLean.STree.depth_lt_length
+#print axioms JammaLean.STree.fdot_err_le_fpGamma
+#print axioms JammaLean.STree.fkin_err_le_fpGamma
+#print axioms JammaLean.STree.fwdot_err_le_fpGamma
+#print axioms JammaLean.STree.fkin_err_float64
+#print axioms JammaLean.STree.fwdot_err_float64
+#print axioms JammaLean.STree.sum_abs_mul_le_norm
+#print axioms JammaLean.STree.fdot_err_le_fpGamma_norm
+#print axioms JammaLean.two_impl_le

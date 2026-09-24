@@ -5,6 +5,54 @@ import Mathlib.Data.Matrix.ColumnRowPartitioned
 import Mathlib.Algebra.Order.Star.Real
 import Mathlib.Analysis.InnerProductSpace.PiL2
 import JammaLean.Profile
+import JammaLean.Pab
+import JammaLean.Rotation
+
+/-!
+# `_reml_logl` is the likelihood of the error contrasts
+
+`_reml_logl` (`src/jamma/lmm/likelihood_numpy.py`) evaluates, with `c` covariates `W`
+and `df = n - c`,
+
+    _logl_const(df) - 0.5 logdet_h - 0.5 (logdet(Pab) - logdet_iab) - 0.5 df log P_yy
+
+where `logdet_h = log det H`, `_logdet_diag(Pab)` and `logdet_iab = _logdet_diag(Iab)`
+sum the logged CalcPab pivots at weights `Hi_eval` and `1`, and `P_yy = Pab[c, yy]`.
+The textbook REML is the Gaussian likelihood of `Aᵀy ~ N(0, s AᵀHA)` for any `A` with
+orthonormal columns spanning the complement of `W` (`AᵀA = 1`, `AᵀW = 0`,
+`df + c = n`). This file proves the two agree exactly, with no constant left over.
+
+Dense matrix form, `P = H⁻¹ - H⁻¹W(WᵀH⁻¹W)⁻¹WᵀH⁻¹` (`projP`):
+
+* `contrast_inv_eq_projP`, `contrast_quad_eq_pyy` (Harville): `A (AᵀHA)⁻¹ Aᵀ = P`, so
+  the contrast quadratic form is `P_yy`. Only `det H ≠ 0` and `det (WᵀH⁻¹W) ≠ 0` are
+  needed, not symmetry.
+* `det_contrast`: `det (AᵀHA) = det H · det (WᵀH⁻¹W) / det (WᵀW)`. This is why
+  `logdet_iab` must be subtracted: it turns `logdet_h + logdet(Pab)` into
+  `log det (AᵀHA)`.
+* `remlLogL_eq_contrast`, `contrastLogL_le_remlLogL`, `contrastLogL_at_argmax`: for
+  positive definite `H` and full-rank `W`, `remlLogL` (the formula above) is the
+  maximum over `s > 0` of the contrast log-likelihood, attained at `s = P_yy / df`.
+* `exists_contrast_basis`: such an `A` always exists (an orthonormal basis of `ker Wᵀ`).
+
+Centring (`-gk` with a centred kinship, `Kc = Pc K Pc`, `Pc = I - 11ᵀ/n`):
+
+* `contrast_centered_kinship`: if `1` is in the column span of `W` (an intercept),
+  `Aᵀ Kc A = Aᵀ K A`, so `Aᵀ H_c A = Aᵀ H A` at every `λ`.
+* `remlLogL_centering_invariant`: `_reml_logl` from `Kc` equals `_reml_logl` from `K`
+  at every `λ ≥ 0`, for positive semidefinite `K`. MLE has no contrast form and is
+  not covered.
+
+The code's `Pab` form, on rotated vectors weighted by `√Hi_eval` (`Rotation.lean`):
+
+* `pab_eq_schur`: the `k` sequential CalcPab projections equal the one-shot formula
+  `⟪a, b⟫ - (G⁻¹⟪w, a⟫) · ⟪w, b⟫`, `G` the covariate Gram matrix.
+* `det_gram_eq_prod`, `log_det_gram`: `det G` is the product of the pivots
+  `Pab[i, w_i w_i]`, so `_logdet_diag` is `log det G` when every pivot is positive.
+* `pab_eq_projP`, `remlLogLPab_eq`, `remlLogLPab_eq_contrast`: the `Pab`-based
+  `_reml_logl` equals the dense `remlLogL`, and hence the profiled contrast
+  likelihood, given positive pivots at `λ` and at `λ = 0` (the `Iab` weights).
+-/
 
 namespace JammaLean
 
@@ -410,5 +458,220 @@ theorem remlLogL_centering_invariant (W : Matrix n c ℝ) (hW : Function.Injecti
     contrast_centered_hMat W A hAW hone]
 
 end CentringFree
+
+section PabBridge
+
+variable {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+
+local notation "⟪" x ", " y "⟫" => @inner ℝ _ _ x y
+
+/-- The Gram matrix of the first `k` covariates, `Pab[0, w_i w_j]`. -/
+noncomputable def gram (w : ℕ → E) (k : ℕ) : Matrix (Fin k) (Fin k) ℝ :=
+  Matrix.of fun i j => ⟪w i, w j⟫
+
+/-- The covariate cross products `Pab[0, w_i a]`. -/
+noncomputable def crossVec (w : ℕ → E) (k : ℕ) (a : E) : Fin k → ℝ :=
+  fun i => ⟪w i, a⟫
+
+/-- **CalcPab computes the Schur complement.** With an invertible Gram matrix `G`,
+`Pab[k, ab] = ⟪a, b⟫ - (G⁻¹ ⟪w, a⟫) · ⟪w, b⟫`: the `k` sequential projections of
+`calc_pab` equal the one-shot projection formula. -/
+theorem pab_eq_schur (w : ℕ → E) (k : ℕ) (hG : IsUnit (gram w k).det) (a b : E) :
+    pab w k a b = ⟪a, b⟫ - ((gram w k)⁻¹ *ᵥ crossVec w k a) ⬝ᵥ crossVec w k b := by
+  set coef := (gram w k)⁻¹ *ᵥ crossVec w k a
+  set x := a - ∑ j : Fin k, coef j • w j
+  have hx_perp : x ∈ (covSpan w k)ᗮ := by
+    apply mem_orthogonal_covSpan
+    intro i hi
+    have h1 := congrFun (show gram w k *ᵥ coef = crossVec w k a by
+      rw [mulVec_mulVec, mul_nonsing_inv _ hG, one_mulVec]) ⟨i, hi⟩
+    simp only [mulVec, dotProduct, gram, crossVec, of_apply] at h1
+    simp only [x, inner_sub_right, inner_sum, inner_smul_right]
+    rw [← h1]
+    simp only [mul_comm, sub_self]
+  have hx_span : a - x ∈ covSpan w k := by
+    have : a - x = ∑ j : Fin k, coef j • w j := by simp [x]
+    rw [this]
+    exact Submodule.sum_mem _ fun j _ => Submodule.smul_mem _ _ (w_mem_covSpan w j.2)
+  rw [pab_eq_inner_resid_left, ← resid_unique w k a x hx_perp hx_span]
+  simp only [x, inner_sub_left, sum_inner, inner_smul_left, RCLike.conj_to_real, dotProduct,
+    crossVec]
+
+/-- One CalcPab pivot extends the Gram determinant: `det G_{k+1} = det G_k · Pab[k, w_k w_k]`. -/
+theorem det_gram_succ (w : ℕ → E) (k : ℕ) (hG : IsUnit (gram w k).det) :
+    (gram w (k + 1)).det = (gram w k).det * pab w k (w k) (w k) := by
+  let _ := invertibleOfIsUnitDet _ hG
+  have hblk : (gram w (k + 1)).submatrix finSumFinEquiv finSumFinEquiv =
+      fromBlocks (gram w k) (Matrix.of fun i (_ : Fin 1) => ⟪w i, w k⟫)
+        (Matrix.of fun (_ : Fin 1) j => ⟪w k, w j⟫) (Matrix.of fun _ _ => ⟪w k, w k⟫) := by
+    ext (i | i) (j | j) <;> simp [gram, Fin.natAdd, Fin.fin_one_eq_zero]
+  rw [← det_submatrix_equiv_self finSumFinEquiv, hblk, det_fromBlocks₁₁, det_fin_one,
+    pab_eq_schur w k hG, invOf_eq_nonsing_inv]
+  congr 1
+  simp only [Matrix.sub_apply, of_apply, mul_apply, mulVec, dotProduct, crossVec]
+  congr 1
+  simp only [Finset.sum_mul]
+  rw [Finset.sum_comm]
+  refine Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => ?_
+  rw [real_inner_comm (w i) (w k)]
+  ring
+
+/-- The Gram determinant is the product of the CalcPab pivots `Pab[i, w_i w_i]`. -/
+theorem det_gram_eq_prod (w : ℕ → E) (k : ℕ)
+    (hpiv : ∀ i < k, 0 < pab w i (w i) (w i)) :
+    (gram w k).det = ∏ i ∈ Finset.range k, pab w i (w i) (w i) := by
+  induction k with
+  | zero => simp [det_isEmpty]
+  | succ k ih =>
+    have ih' := ih fun i hi => hpiv i (Nat.lt_succ_of_lt hi)
+    have hpos : 0 < (gram w k).det := by
+      rw [ih']
+      exact Finset.prod_pos fun i hi => hpiv i (Nat.lt_succ_of_lt (Finset.mem_range.mp hi))
+    rw [det_gram_succ w k (isUnit_iff_ne_zero.mpr hpos.ne'), ih', Finset.prod_range_succ]
+
+/-- `_logdet_diag(Pab)`, the sum of the logged pivots, is `log det G`. -/
+theorem log_det_gram (w : ℕ → E) (k : ℕ) (hpiv : ∀ i < k, 0 < pab w i (w i) (w i)) :
+    Real.log (gram w k).det = ∑ i ∈ Finset.range k, Real.log (pab w i (w i) (w i)) := by
+  rw [det_gram_eq_prod w k hpiv, Real.log_prod]
+  intro i hi
+  exact (hpiv i (Finset.mem_range.mp hi)).ne'
+
+end PabBridge
+
+section DenseBridge
+
+variable {k : ℕ}
+
+/-- A rotated, `√Hi_eval`-scaled vector: `Uᵀa` as `calc_pab` weights it. -/
+noncomputable def rotVec (U : Matrix n n ℝ) (ev : n → ℝ) (lam : ℝ) (a : n → ℝ) :
+    EuclideanSpace ℝ n :=
+  weighted (fun r => (lam * ev r + 1)⁻¹) (rot U a)
+
+/-- The covariates as CalcPab sees them: column `i` of `W`, rotated by `Uᵀ` and
+scaled by `√Hi_eval`. Indices `≥ k` are unused and set to `0`. -/
+noncomputable def covVecs (U : Matrix n n ℝ) (ev : n → ℝ) (lam : ℝ) (W : Matrix n (Fin k) ℝ) :
+    ℕ → EuclideanSpace ℝ n :=
+  fun i => if h : i < k then rotVec U ev lam fun r => W r ⟨i, h⟩ else 0
+
+omit [DecidableEq n] in
+theorem transpose_mul_mul_apply {m : Type*} (W : Matrix n m ℝ) (M : Matrix n n ℝ) (i j : m) :
+    (Wᵀ * M * W) i j = (fun r => W r i) ⬝ᵥ (M *ᵥ fun r => W r j) := by
+  rw [Matrix.mul_assoc]
+  simp only [mul_apply, transpose_apply, mulVec, dotProduct]
+
+theorem hMat_inv_transpose (U : Matrix n n ℝ) (hU : Uᵀ * U = 1) (ev : n → ℝ) (lam : ℝ)
+    (hpos : ∀ i, lam * ev i + 1 ≠ 0) : ((hMat U ev lam)⁻¹)ᵀ = (hMat U ev lam)⁻¹ := by
+  rw [hMat_inv U hU ev lam hpos, transpose_mul, transpose_mul, transpose_transpose,
+    diagonal_transpose, Matrix.mul_assoc]
+
+/-- Row 0 of `Pab` on the covariates is the dense `Wᵀ H⁻¹ W`. -/
+theorem gram_covVecs (U : Matrix n n ℝ) (hU : Uᵀ * U = 1) (ev : n → ℝ) (lam : ℝ)
+    (hpos : ∀ i, 0 < lam * ev i + 1) (W : Matrix n (Fin k) ℝ) :
+    gram (covVecs U ev lam W) k = Wᵀ * (hMat U ev lam)⁻¹ * W := by
+  ext i j
+  simp only [gram, covVecs, of_apply, i.2, j.2, dite_true, Fin.eta]
+  rw [transpose_mul_mul_apply]
+  exact pab_row0_eq_dense U hU ev lam hpos _ _
+
+/-- **JAMMA's `P_yy` is `yᵀ P y`.** Running the CalcPab recursion to level `k` on the
+rotated, weighted covariates and phenotype gives `yᵀ P y` with the dense
+`P = H⁻¹ - H⁻¹ W (Wᵀ H⁻¹ W)⁻¹ Wᵀ H⁻¹`. -/
+theorem pab_eq_projP (U : Matrix n n ℝ) (hU : Uᵀ * U = 1) (ev : n → ℝ) (lam : ℝ)
+    (hpos : ∀ i, 0 < lam * ev i + 1) (W : Matrix n (Fin k) ℝ)
+    (hG : IsUnit (Wᵀ * (hMat U ev lam)⁻¹ * W).det) (a b : n → ℝ) :
+    pab (covVecs U ev lam W) k (rotVec U ev lam a) (rotVec U ev lam b) =
+      a ⬝ᵥ (projP (hMat U ev lam) W *ᵥ b) := by
+  set Hi := (hMat U ev lam)⁻¹ with hHi
+  have hdense : ∀ u v : n → ℝ,
+      @inner ℝ _ _ (rotVec U ev lam u) (rotVec U ev lam v) = u ⬝ᵥ (Hi *ᵥ v) :=
+    fun u v => pab_row0_eq_dense U hU ev lam hpos u v
+  have hgram : gram (covVecs U ev lam W) k = Wᵀ * Hi * W := gram_covVecs U hU ev lam hpos W
+  have hcross : ∀ u, crossVec (covVecs U ev lam W) k (rotVec U ev lam u) = Wᵀ *ᵥ (Hi *ᵥ u) := by
+    intro u
+    funext i
+    simp only [crossVec, covVecs, i.2, dite_true, Fin.eta]
+    rw [hdense]
+    simp [mulVec, dotProduct]
+  have hsymm : Hiᵀ = Hi := hMat_inv_transpose U hU ev lam fun i => (hpos i).ne'
+  rw [pab_comm, pab_eq_schur _ k (hgram ▸ hG), real_inner_comm, hgram, hcross, hcross, hdense,
+    projP, ← hHi, sub_mulVec, dotProduct_sub, dotProduct_comm (_ *ᵥ _)]
+  congr 1
+  calc (Wᵀ *ᵥ (Hi *ᵥ a)) ⬝ᵥ ((Wᵀ * Hi * W)⁻¹ *ᵥ (Wᵀ *ᵥ (Hi *ᵥ b)))
+      = ((Hi *ᵥ a) ᵥ* W) ⬝ᵥ ((Wᵀ * Hi * W)⁻¹ *ᵥ (Wᵀ *ᵥ (Hi *ᵥ b))) := by
+        rw [mulVec_transpose]
+    _ = (a ᵥ* Hi) ⬝ᵥ (W *ᵥ ((Wᵀ * Hi * W)⁻¹ *ᵥ (Wᵀ *ᵥ (Hi *ᵥ b)))) := by
+        rw [← dotProduct_mulVec, ← hsymm, mulVec_transpose, hsymm]
+    _ = a ⬝ᵥ ((Hi * W * (Wᵀ * Hi * W)⁻¹ * Wᵀ * Hi) *ᵥ b) := by
+        rw [← dotProduct_mulVec]
+        simp only [mulVec_mulVec, Matrix.mul_assoc]
+
+open Real in
+/-- `_reml_logl` as the code evaluates it: `logdet_h = Σ log(λ ev + 1)`, `logdet_hiw` the
+logged `Pab` pivots minus the logged `Iab` pivots (`Iab` is `Pab` with `Hi_eval = 1`,
+i.e. `λ = 0`), and `P_yy = Pab[k, yy]`. -/
+noncomputable def remlLogLPab (df : ℝ) (U : Matrix n n ℝ) (ev : n → ℝ) (lam : ℝ)
+    (W : Matrix n (Fin k) ℝ) (y : n → ℝ) : ℝ :=
+  let w := covVecs U ev lam W
+  let w₀ := covVecs U ev 0 W
+  loglConst df - (∑ i, log (lam * ev i + 1)) / 2
+    - (∑ i ∈ Finset.range k, log (pab w i (w i) (w i))
+        - ∑ i ∈ Finset.range k, log (pab w₀ i (w₀ i) (w₀ i))) / 2
+    - df / 2 * log (pab w k (rotVec U ev lam y) (rotVec U ev lam y))
+
+/-- **The code's `Pab`-based `_reml_logl` is the dense REML formula**, given positive
+pivots (the condition under which `_logdet_diag` returns a finite value). -/
+theorem remlLogLPab_eq (U : Matrix n n ℝ) (hU : Uᵀ * U = 1) (ev : n → ℝ) (lam : ℝ)
+    (hpos : ∀ i, 0 < lam * ev i + 1) (W : Matrix n (Fin k) ℝ)
+    (hpiv : ∀ i < k, 0 < pab (covVecs U ev lam W) i (covVecs U ev lam W i)
+      (covVecs U ev lam W i))
+    (hpiv₀ : ∀ i < k, 0 < pab (covVecs U ev 0 W) i (covVecs U ev 0 W i) (covVecs U ev 0 W i))
+    (df : ℝ) (y : n → ℝ) :
+    remlLogLPab df U ev lam W y = remlLogL df (hMat U ev lam) W y := by
+  have hpos₀ : ∀ i, 0 < 0 * ev i + 1 := fun i => by simp
+  have hH0 : hMat U ev 0 = 1 := by simp [hMat]
+  have hG : IsUnit (Wᵀ * (hMat U ev lam)⁻¹ * W).det := by
+    rw [← gram_covVecs U hU ev lam hpos W, det_gram_eq_prod _ k hpiv]
+    exact isUnit_iff_ne_zero.mpr (Finset.prod_pos fun i hi =>
+      hpiv i (Finset.mem_range.mp hi)).ne'
+  have hlog := log_det_gram _ k hpiv
+  have hlog₀ := log_det_gram _ k hpiv₀
+  rw [gram_covVecs U hU ev lam hpos W] at hlog
+  rw [gram_covVecs U hU ev 0 hpos₀ W, hH0, inv_one, Matrix.mul_one] at hlog₀
+  simp only [remlLogLPab, remlLogL]
+  rw [← hlog, ← hlog₀, ← logdet_hMat U hU ev lam hpos,
+    pab_eq_projP U hU ev lam hpos W hG]
+
+/-- `H = U diag(λ ev + 1) Uᵀ` is positive definite when every `λ ev + 1 > 0`. -/
+theorem hMat_posDef_of_pos (U : Matrix n n ℝ) (hU : Uᵀ * U = 1) (ev : n → ℝ) (lam : ℝ)
+    (hpos : ∀ i, 0 < lam * ev i + 1) : (hMat U ev lam).PosDef := by
+  have hUUt : U * Uᵀ = 1 := mul_eq_one_comm.mp hU
+  have hinj : Function.Injective Uᵀ.mulVec := by
+    intro x y h
+    have := congrArg (U *ᵥ ·) h
+    simpa [mulVec_mulVec, hUUt] using this
+  have := (PosDef.diagonal hpos).conjTranspose_mul_mul_same hinj
+  rwa [conjTranspose_eq_transpose_of_trivial, transpose_transpose,
+    ← hMat_eq_rotated U hU ev lam] at this
+
+/-- **End to end.** The code's `Pab`-based `_reml_logl`, at `df = n - k`, is the
+profiled Gaussian log-likelihood of the error contrasts `Aᵀy ~ N(0, s AᵀHA)`. -/
+theorem remlLogLPab_eq_contrast {d : Type*} [Fintype d] [DecidableEq d]
+    (U : Matrix n n ℝ) (hU : Uᵀ * U = 1) (ev : n → ℝ) (lam : ℝ)
+    (hpos : ∀ i, 0 < lam * ev i + 1) (W : Matrix n (Fin k) ℝ)
+    (hW : Function.Injective W.mulVec)
+    (hpiv : ∀ i < k, 0 < pab (covVecs U ev lam W) i (covVecs U ev lam W i)
+      (covVecs U ev lam W i))
+    (hpiv₀ : ∀ i < k, 0 < pab (covVecs U ev 0 W) i (covVecs U ev 0 W i) (covVecs U ev 0 W i))
+    (A : Matrix n d ℝ) (hA : Aᵀ * A = 1) (hAW : Aᵀ * W = 0)
+    (hcard : Fintype.card n = Fintype.card d + k) (y : n → ℝ) :
+    remlLogLPab (Fintype.card d) U ev lam W y =
+      profiledLogL (Fintype.card d)
+          ((Aᵀ *ᵥ y) ⬝ᵥ ((Aᵀ * hMat U ev lam * A)⁻¹ *ᵥ (Aᵀ *ᵥ y)))
+        - Real.log (Aᵀ * hMat U ev lam * A).det / 2 := by
+  rw [remlLogLPab_eq U hU ev lam hpos W hpiv hpiv₀,
+    remlLogL_eq_contrast _ W A (hMat_posDef_of_pos U hU ev lam hpos) hW hA hAW
+      (by rw [hcard, Fintype.card_fin])]
+
+end DenseBridge
 
 end JammaLean

@@ -1,0 +1,31 @@
+import JammaLean
+
+/-! Prints the axioms each headline theorem depends on. Every line must list only
+`propext`, `Classical.choice` and `Quot.sound`; `sorryAx` means an unfinished proof. -/
+
+#print axioms JammaLean.abIndex_image
+#print axioms JammaLean.abIndex_comm
+#print axioms JammaLean.pab_succ
+#print axioms JammaLean.resid_spec
+#print axioms JammaLean.resid_unique
+#print axioms JammaLean.pab_eq_inner_resid_left
+#print axioms JammaLean.hMat_inv
+#print axioms JammaLean.quad_form_rotated
+#print axioms JammaLean.logdet_hMat
+#print axioms JammaLean.pab_row0_eq_dense
+#print axioms JammaLean.px_yy_eq
+#print axioms JammaLean.waldF_eq_beta_sq_div_var
+#print axioms JammaLean.waldF_eq_r2
+#print axioms JammaLean.scoreF_eq_r2
+#print axioms JammaLean.scoreF_le_n
+#print axioms JammaLean.waldF_nonneg
+#print axioms JammaLean.complement_z
+#print axioms JammaLean.gaussLogL_le_profiled
+#print axioms JammaLean.gaussLogL_at_argmax
+#print axioms JammaLean.gaussLogL_argmax_unique
+#print axioms JammaLean.logdetKernel_eq_sum_log
+
+-- `abIndex` is computable: the packed slots for n_cvt = 1 (cols = 3), in the
+-- order `build_index_table` walks them.
+#eval (List.range 3).flatMap fun k => (List.range' k (3 - k)).map fun j =>
+  (k + 1, j + 1, JammaLean.abIndex 3 (k + 1) (j + 1))

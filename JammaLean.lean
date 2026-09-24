@@ -9,3 +9,4 @@ import JammaLean.Lrt
 import JammaLean.FrexpBits
 import JammaLean.GramDet
 import JammaLean.ClosedForm
+import JammaLean.Invariance

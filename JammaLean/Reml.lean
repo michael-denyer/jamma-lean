@@ -2,6 +2,7 @@ import Mathlib.LinearAlgebra.Matrix.NonsingularInverse
 import Mathlib.LinearAlgebra.Matrix.SchurComplement
 import Mathlib.LinearAlgebra.Matrix.PosDef
 import Mathlib.Data.Matrix.ColumnRowPartitioned
+import Mathlib.Algebra.Order.Star.Real
 import JammaLean.Profile
 
 namespace JammaLean
@@ -160,5 +161,82 @@ theorem det_contrast (H : Matrix n n ℝ) (hH : IsUnit H.det)
   linear_combination (-(Aᵀ * H * A).det) * e1 + (H.det * (Wᵀ * H⁻¹ * W).det) * hS
 
 end Basis
+
+section Likelihood
+
+open Real
+
+/-- JAMMA's `_reml_logl`, with `logdet_hiw = log det (Wᵀ H⁻¹ W) - log det (WᵀW)` and
+`P_yy = yᵀ P y`. -/
+noncomputable def remlLogL (df : ℝ) (H : Matrix n n ℝ) (W : Matrix n c ℝ) (y : n → ℝ) : ℝ :=
+  loglConst df - log H.det / 2 - (log (Wᵀ * H⁻¹ * W).det - log (Wᵀ * W).det) / 2
+    - df / 2 * log (y ⬝ᵥ (projP H W *ᵥ y))
+
+/-- The Gaussian log-likelihood of the contrasts `z = Aᵀy ~ N(0, s M)`, `M = AᵀHA`:
+`-(df/2) log (2π s) - ½ log det M - zᵀ M⁻¹ z / (2 s)`. -/
+noncomputable def contrastLogL (M : Matrix d d ℝ) (z : d → ℝ) (s : ℝ) : ℝ :=
+  gaussLogL (Fintype.card d) (z ⬝ᵥ (M⁻¹ *ᵥ z)) s - log M.det / 2
+
+variable (H : Matrix n n ℝ) (W : Matrix n c ℝ) (A : Matrix n d ℝ)
+
+/-- The positivity facts a positive definite `H` and a full-column-rank `W` give. -/
+theorem reml_dets_pos (hH : H.PosDef) (hW : Function.Injective W.mulVec) :
+    0 < H.det ∧ 0 < (Wᵀ * H⁻¹ * W).det ∧ 0 < (Wᵀ * W).det := by
+  have hG := hH.inv.conjTranspose_mul_mul_same hW
+  have hWW := PosDef.conjTranspose_mul_self W hW
+  rw [conjTranspose_eq_transpose_of_trivial] at hG hWW
+  exact ⟨hH.det_pos, hG.det_pos, hWW.det_pos⟩
+
+/-- **JAMMA's REML is the profiled contrast likelihood.** `_reml_logl` equals
+`profiledLogL df (zᵀ M⁻¹ z) - ½ log det M` with `z = Aᵀy`, `M = AᵀHA`: no additive
+constant is left over, because `logdet_iab` supplies exactly the `log det (WᵀW)` that
+converts `log det H + log det (Wᵀ H⁻¹ W)` into `log det (AᵀHA)`. -/
+theorem remlLogL_eq_contrast (hH : H.PosDef) (hW : Function.Injective W.mulVec)
+    (hA : Aᵀ * A = 1) (hAW : Aᵀ * W = 0)
+    (hcard : Fintype.card n = Fintype.card d + Fintype.card c) (y : n → ℝ) :
+    remlLogL (Fintype.card d) H W y =
+      profiledLogL (Fintype.card d) ((Aᵀ *ᵥ y) ⬝ᵥ ((Aᵀ * H * A)⁻¹ *ᵥ (Aᵀ *ᵥ y)))
+        - log (Aᵀ * H * A).det / 2 := by
+  obtain ⟨hHp, hGp, hWWp⟩ := reml_dets_pos H W hH hW
+  have hcomp := contrast_complete W A hA hAW (isUnit_iff_ne_zero.mpr hWWp.ne') hcard
+  rw [contrast_quad_eq_pyy H W A (isUnit_iff_ne_zero.mpr hHp.ne')
+      (isUnit_iff_ne_zero.mpr hGp.ne') hA hAW hcomp,
+    det_contrast W A H (isUnit_iff_ne_zero.mpr hHp.ne') (isUnit_iff_ne_zero.mpr hGp.ne')
+      (isUnit_iff_ne_zero.mpr hWWp.ne') hA hAW hcard,
+    log_div (by positivity) hWWp.ne', log_mul hHp.ne' hGp.ne']
+  unfold remlLogL profiledLogL
+  ring
+
+/-- JAMMA's REML bounds the contrast likelihood at every residual variance `s > 0`. -/
+theorem contrastLogL_le_remlLogL [Nonempty d] (hH : H.PosDef)
+    (hW : Function.Injective W.mulVec) (hA : Aᵀ * A = 1) (hAW : Aᵀ * W = 0)
+    (hcard : Fintype.card n = Fintype.card d + Fintype.card c) (y : n → ℝ)
+    (hy : 0 < y ⬝ᵥ (projP H W *ᵥ y)) {s : ℝ} (hs : 0 < s) :
+    contrastLogL (Aᵀ * H * A) (Aᵀ *ᵥ y) s ≤ remlLogL (Fintype.card d) H W y := by
+  obtain ⟨hHp, hGp, hWWp⟩ := reml_dets_pos H W hH hW
+  have hcomp := contrast_complete W A hA hAW (isUnit_iff_ne_zero.mpr hWWp.ne') hcard
+  have hq := contrast_quad_eq_pyy H W A (isUnit_iff_ne_zero.mpr hHp.ne')
+      (isUnit_iff_ne_zero.mpr hGp.ne') hA hAW hcomp y
+  rw [remlLogL_eq_contrast H W A hH hW hA hAW hcard y, contrastLogL]
+  have := gaussLogL_le_profiled (m := Fintype.card d)
+    (by exact_mod_cast Fintype.card_pos) (hq ▸ hy) hs
+  linarith
+
+/-- ... and attains it at `s = P_yy / df`, so `_reml_logl` is the maximum over the
+residual variance of the Gaussian log-likelihood of the error contrasts. -/
+theorem contrastLogL_at_argmax [Nonempty d] (hH : H.PosDef)
+    (hW : Function.Injective W.mulVec) (hA : Aᵀ * A = 1) (hAW : Aᵀ * W = 0)
+    (hcard : Fintype.card n = Fintype.card d + Fintype.card c) (y : n → ℝ)
+    (hy : 0 < y ⬝ᵥ (projP H W *ᵥ y)) :
+    contrastLogL (Aᵀ * H * A) (Aᵀ *ᵥ y) (y ⬝ᵥ (projP H W *ᵥ y) / Fintype.card d) =
+      remlLogL (Fintype.card d) H W y := by
+  obtain ⟨hHp, hGp, hWWp⟩ := reml_dets_pos H W hH hW
+  have hcomp := contrast_complete W A hA hAW (isUnit_iff_ne_zero.mpr hWWp.ne') hcard
+  have hq := contrast_quad_eq_pyy H W A (isUnit_iff_ne_zero.mpr hHp.ne')
+      (isUnit_iff_ne_zero.mpr hGp.ne') hA hAW hcomp y
+  rw [remlLogL_eq_contrast H W A hH hW hA hAW hcard y, contrastLogL, hq,
+    gaussLogL_at_argmax (by exact_mod_cast Fintype.card_pos) hy]
+
+end Likelihood
 
 end JammaLean

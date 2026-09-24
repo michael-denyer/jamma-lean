@@ -53,13 +53,24 @@ mutation of the production formula.
 | **§5** safeguarded Newton refinement | `Optimizer.newtonLoop_mem`, `lambdaSearch_error`, `newtonLoop_affine`; limit shown by `refine_can_leave_golden_bracket` | |
 | **§6** Wald: `Px_yy = P_yy − P_xy²/P_xx`, `F = β²/SE²` | `Stats.px_yy_eq`, `waldF_eq_beta_sq_div_var`, `waldF_eq_r2`, `waldF_nonneg` | `test_wald_statistics_satisfy_the_r2_identities` |
 | **§6** p-value complement `f/(df+f) = 1 − df/(df+f)` | `Stats.complement_z` | |
+| **§6** `betainc(df/2, 1/2, df/(df+F))` is the F(1,df) upper tail | `PValues.fTail_eq_incBeta`, `fTail_zero` (the density integrates to 1, so `F ≤ 0 ⇒ p = 1` is the right limit) | |
+| **§8** `chi2_sf(x) = erfc(√(x/2))` is the χ²(1) upper tail | `PValues.chiSq1_tail_eq_erfc`, `two_gaussian_tail_eq_erfc` | |
+| **NUMERICAL_EQUIVALENCE_BOUND** assumption 7: the CDFs are Lipschitz "in the relevant range" | `PValues.fTail_lipschitzOn` (constant `fPDF m F₀` on `[F₀, ∞)`); the qualifier is necessary: `fTail_not_lipschitzOn`, `erfc_sqrt_half_not_lipschitzOn` | |
 | **§7** Score `F = n P_xy²/(P_yy P_xx)` | `Stats.scoreF_eq_r2`, `scoreF_le_n` | `test_score_f_is_n_r2_and_at_most_n`, `test_native_score_f_is_n_r2` |
 | **§8** the exact LRT statistic is non-negative | `Lrt.lrt_stat_nonneg`, `mleLogL_H0_le_H1` | `test_mle_with_genotype_never_below_null_at_shared_lambda` |
 
 ## Findings
 
-The proofs back the documented claims, with these qualifications:
+The proofs back the documented claims, with these qualifications. The §3, §4
+and §5 wording points and the NUMERICAL_EQUIVALENCE_BOUND §3 point are corrected
+in JAMMA by
+[#473](https://github.com/michael-denyer/jamma/pull/473).
 
+* **§8 wording.** `GEMMA_EQUIVALENCE.md` §8 says that near `LRT ≈ 0` the CDF is
+  linear, so `dp ≈ d(LRT)`. The χ²(1) tail `erfc(√(x/2))` has unbounded slope at
+  0 (`erfc_sqrt_half_not_lipschitzOn`): `|dp/dx| = e^(−x/2)/√(2πx)`. Small LRT
+  differences near zero are amplified, not passed through, which is a stronger
+  reason for the wide `p_lrt` tolerance.
 * **§4 formula.** `GEMMA_EQUIVALENCE.md` §4 writes the REML term as
   `−½ log|WᵀH⁻¹W|`. JAMMA computes `−½ (log|WᵀH⁻¹W| − log|WᵀW|)`, which is the
   form proved equal to the error-contrast likelihood (`Reml.remlLogL_eq_contrast`).
@@ -85,8 +96,9 @@ The proofs back the documented claims, with these qualifications:
 
 ## Not proved
 
-* The F and χ² distribution functions (`betainc`, `chi2_sf`). Mathlib has no
-  regularised incomplete beta function.
+* The numerical accuracy of the `betainc` (Cephes, GSL) and libm `erfc`
+  implementations, the `δ_CDF` term. The distribution identities they evaluate
+  are proved (`PValues`).
 * Floating-point error beyond single sums and dot products: rounding inside the
   Pab recursion (`Degeneracy` bounds one step's sensitivity to a given input
   error, not the accumulated rounding), the eigendecomposition (backward

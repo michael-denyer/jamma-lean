@@ -7,3 +7,4 @@ import JammaLean.Logdet
 import JammaLean.Kinship
 import JammaLean.Lrt
 import JammaLean.FrexpBits
+import JammaLean.GramDet

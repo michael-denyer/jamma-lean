@@ -43,6 +43,11 @@ import JammaLean
 #print axioms JammaLean.gram_weighted_rot_eq
 #print axioms JammaLean.gram_rot_eq
 #print axioms JammaLean.logdet_hiw_eq
+#print axioms JammaLean.resid_eq_closedForm
+#print axioms JammaLean.pab_eq_closedForm
+#print axioms JammaLean.covGram_isUnit_det
+#print axioms JammaLean.pab_eq_matrix_closedForm
+#print axioms JammaLean.pab_rotated_eq_closedForm
 
 -- `abIndex` is computable: the packed slots for n_cvt = 1 (cols = 3), in the
 -- order `build_index_table` walks them.

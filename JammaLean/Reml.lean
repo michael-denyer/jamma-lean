@@ -3,6 +3,7 @@ import Mathlib.LinearAlgebra.Matrix.SchurComplement
 import Mathlib.LinearAlgebra.Matrix.PosDef
 import Mathlib.Data.Matrix.ColumnRowPartitioned
 import Mathlib.Algebra.Order.Star.Real
+import Mathlib.Analysis.InnerProductSpace.PiL2
 import JammaLean.Profile
 
 namespace JammaLean
@@ -187,6 +188,23 @@ theorem reml_dets_pos (hH : H.PosDef) (hW : Function.Injective W.mulVec) :
   rw [conjTranspose_eq_transpose_of_trivial] at hG hWW
   exact ⟨hH.det_pos, hG.det_pos, hWW.det_pos⟩
 
+/-- `_reml_logl` at any `df` depends on `H` only through `M = AᵀHA`:
+`loglConst df - ½ log det M - (df/2) log (zᵀ M⁻¹ z)` with `z = Aᵀy`. -/
+theorem remlLogL_eq_contrast_df (hH : H.PosDef) (hW : Function.Injective W.mulVec)
+    (hA : Aᵀ * A = 1) (hAW : Aᵀ * W = 0)
+    (hcard : Fintype.card n = Fintype.card d + Fintype.card c) (df : ℝ) (y : n → ℝ) :
+    remlLogL df H W y = loglConst df - log (Aᵀ * H * A).det / 2
+      - df / 2 * log ((Aᵀ *ᵥ y) ⬝ᵥ ((Aᵀ * H * A)⁻¹ *ᵥ (Aᵀ *ᵥ y))) := by
+  obtain ⟨hHp, hGp, hWWp⟩ := reml_dets_pos H W hH hW
+  have hcomp := contrast_complete W A hA hAW (isUnit_iff_ne_zero.mpr hWWp.ne') hcard
+  rw [contrast_quad_eq_pyy H W A (isUnit_iff_ne_zero.mpr hHp.ne')
+      (isUnit_iff_ne_zero.mpr hGp.ne') hA hAW hcomp,
+    det_contrast W A H (isUnit_iff_ne_zero.mpr hHp.ne') (isUnit_iff_ne_zero.mpr hGp.ne')
+      (isUnit_iff_ne_zero.mpr hWWp.ne') hA hAW hcard,
+    log_div (by positivity) hWWp.ne', log_mul hHp.ne' hGp.ne']
+  unfold remlLogL
+  ring
+
 /-- **JAMMA's REML is the profiled contrast likelihood.** `_reml_logl` equals
 `profiledLogL df (zᵀ M⁻¹ z) - ½ log det M` with `z = Aᵀy`, `M = AᵀHA`: no additive
 constant is left over, because `logdet_iab` supplies exactly the `log det (WᵀW)` that
@@ -197,14 +215,7 @@ theorem remlLogL_eq_contrast (hH : H.PosDef) (hW : Function.Injective W.mulVec)
     remlLogL (Fintype.card d) H W y =
       profiledLogL (Fintype.card d) ((Aᵀ *ᵥ y) ⬝ᵥ ((Aᵀ * H * A)⁻¹ *ᵥ (Aᵀ *ᵥ y)))
         - log (Aᵀ * H * A).det / 2 := by
-  obtain ⟨hHp, hGp, hWWp⟩ := reml_dets_pos H W hH hW
-  have hcomp := contrast_complete W A hA hAW (isUnit_iff_ne_zero.mpr hWWp.ne') hcard
-  rw [contrast_quad_eq_pyy H W A (isUnit_iff_ne_zero.mpr hHp.ne')
-      (isUnit_iff_ne_zero.mpr hGp.ne') hA hAW hcomp,
-    det_contrast W A H (isUnit_iff_ne_zero.mpr hHp.ne') (isUnit_iff_ne_zero.mpr hGp.ne')
-      (isUnit_iff_ne_zero.mpr hWWp.ne') hA hAW hcard,
-    log_div (by positivity) hWWp.ne', log_mul hHp.ne' hGp.ne']
-  unfold remlLogL profiledLogL
+  rw [remlLogL_eq_contrast_df H W A hH hW hA hAW hcard, profiledLogL]
   ring
 
 /-- JAMMA's REML bounds the contrast likelihood at every residual variance `s > 0`. -/
@@ -315,5 +326,89 @@ theorem remlLogL_centered (hW : Function.Injective W.mulVec) (hA : Aᵀ * A = 1)
     contrast_centered_hMat W A hAW hone]
 
 end Centring
+
+section Existence
+
+open Module
+
+omit [DecidableEq n] in
+/-- **Error contrasts exist.** For a full-column-rank `W` there is an `A` with
+orthonormal columns, `AᵀW = 0`, and `df + c = n` columns: an orthonormal basis of
+`ker Wᵀ`. -/
+theorem exists_contrast_basis (W : Matrix n c ℝ) (hWW : IsUnit (Wᵀ * W).det) :
+    ∃ (m : ℕ) (A : Matrix n (Fin m) ℝ), Aᵀ * A = 1 ∧ Aᵀ * W = 0 ∧
+      Fintype.card n = Fintype.card (Fin m) + Fintype.card c := by
+  let L : EuclideanSpace ℝ n →ₗ[ℝ] (c → ℝ) :=
+    (Matrix.mulVecLin Wᵀ).comp (WithLp.linearEquiv 2 ℝ (n → ℝ)).toLinearMap
+  have hL : ∀ x, L x = Wᵀ *ᵥ (x : n → ℝ) := fun _ => rfl
+  have hsurj : LinearMap.range L = ⊤ := by
+    rw [LinearMap.range_eq_top]
+    intro u
+    refine ⟨WithLp.toLp 2 (W *ᵥ ((Wᵀ * W)⁻¹ *ᵥ u)), ?_⟩
+    rw [hL, WithLp.ofLp_toLp, mulVec_mulVec, mulVec_mulVec,
+      mul_nonsing_inv _ hWW, one_mulVec]
+  have hrank := LinearMap.finrank_range_add_finrank_ker L
+  rw [hsurj, finrank_top, Module.finrank_fintype_fun_eq_card, finrank_euclideanSpace] at hrank
+  let b := stdOrthonormalBasis ℝ (LinearMap.ker L)
+  refine ⟨finrank ℝ (LinearMap.ker L), Matrix.of fun i j => (b j : EuclideanSpace ℝ n) i,
+    ?_, ?_, ?_⟩
+  · ext j j'
+    have h := orthonormal_iff_ite.mp b.orthonormal j j'
+    rw [Submodule.coe_inner, PiLp.inner_apply] at h
+    simp only [mul_apply, one_apply, transpose_apply, of_apply]
+    simp only [RCLike.inner_apply, conj_trivial] at h
+    rw [← h]
+    exact Finset.sum_congr rfl fun i _ => mul_comm _ _
+  · ext j k
+    have hmem : L (b j) = 0 := (b j).2
+    have := congrFun hmem k
+    rw [hL] at this
+    simp only [mulVec, dotProduct, transpose_apply, Pi.zero_apply] at this
+    simp only [mul_apply, transpose_apply, of_apply, Matrix.zero_apply]
+    rw [← this]
+    exact Finset.sum_congr rfl fun i _ => mul_comm _ _
+  · simp only [Fintype.card_fin]
+    omega
+
+end Existence
+
+section CentringFree
+
+variable (n) in
+theorem transpose_centering : (centering n)ᵀ = centering n := by
+  ext i j
+  simp [centering, one_apply, eq_comm]
+
+omit [Fintype n] in
+/-- `H = λK + I` is positive definite for a positive semidefinite `K` and `λ ≥ 0`. -/
+theorem hMat_posDef {K : Matrix n n ℝ} (hK : K.PosSemidef) {lam : ℝ} (hlam : 0 ≤ lam) :
+    (lam • K + 1).PosDef :=
+  PosDef.posSemidef_add (hK.smul hlam) PosDef.one
+
+/-- Centring keeps a kinship positive semidefinite. -/
+theorem centered_posSemidef {K : Matrix n n ℝ} (hK : K.PosSemidef) :
+    (centering n * K * centering n).PosSemidef := by
+  have := hK.conjTranspose_mul_mul_same (centering n)
+  rwa [conjTranspose_eq_transpose_of_trivial, transpose_centering] at this
+
+/-- **JAMMA's `_reml_logl` is invariant to centring the kinship**, with no contrast
+matrix in the statement: for a full-rank `W` whose column span contains `1`, a
+positive semidefinite `K`, every `λ ≥ 0`, every `df` and every `y`, the value from
+`Kc = Pc K Pc` equals the value from `K`. -/
+theorem remlLogL_centering_invariant (W : Matrix n c ℝ) (hW : Function.Injective W.mulVec)
+    (hone : ∃ v, W *ᵥ v = fun _ => 1) {K : Matrix n n ℝ} (hK : K.PosSemidef)
+    {lam : ℝ} (hlam : 0 ≤ lam) (df : ℝ) (y : n → ℝ) :
+    remlLogL df (lam • (centering n * K * centering n) + 1) W y =
+      remlLogL df (lam • K + 1) W y := by
+  have hWW : IsUnit (Wᵀ * W).det := by
+    have := PosDef.conjTranspose_mul_self W hW
+    rw [conjTranspose_eq_transpose_of_trivial] at this
+    exact isUnit_iff_ne_zero.mpr this.det_pos.ne'
+  obtain ⟨m, A, hA, hAW, hcard⟩ := exists_contrast_basis W hWW
+  rw [remlLogL_eq_contrast_df _ W A (hMat_posDef (centered_posSemidef hK) hlam) hW hA hAW
+      hcard, remlLogL_eq_contrast_df _ W A (hMat_posDef hK hlam) hW hA hAW hcard,
+    contrast_centered_hMat W A hAW hone]
+
+end CentringFree
 
 end JammaLean

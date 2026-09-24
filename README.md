@@ -37,6 +37,7 @@ mutation of the production formula.
 | **§2** early row selection gives the principal submatrix of kinship | `Invariance.kinship_submatrix`, `kinship_select_after_centre` | |
 | **§2** SNP batching does not change K | `Invariance.kinship_eq_sum_blocks`, `kinship_eq_append` | |
 | **§3** results do not depend on the eigenvector signs | `Invariance.pab_signFlip_eq`, `logdet_signFlip_eq`; more generally `pab_rotated_eq`, `logdet_rotated_eq` for any orthogonal eigenbasis | |
+| **NUMERICAL_EQUIVALENCE_BOUND** §2 and assumption 4: eigenvector error `‖ΔU‖ ≲ ε‖K‖/gap(K)` | Not needed for Pab row 0 or `log\|H\|`: with backward error `Û d̂ Ûᵀ = K + E` and `δ = λ‖E‖₂ < 1`, `EigenPerturbation.pab_row0_perturb` moves row 0 by at most `δ/(1−δ)·‖a‖‖b‖` and `logdet_rotated_perturb` moves `log\|H\|` by at most `n·(−log(1−δ))`, with no eigengap term | |
 | **§4** `log\|H\| = Σ log(λ dᵢ + 1)` | `Rotation.logdet_hMat`, `det_hMat` | `test_numpy_logdet_h_equals_slogdet` |
 | **§4** the C mantissa-product logdet equals the log sum | `Logdet.logdetKernel_eq_sum_log`, with the bit split proved in `FrexpBits.frexpBits_hsplit` | `test_native_likelihoods_match_dense_logdet_and_projector` |
 | **§4** Pab recursion; `get_ab_index` transcribes `GetabIndex` | `Pab.pab_succ`, `AbIndex.abIndex_image`, `abIndex_comm` | `test_ab_index_is_a_symmetric_bijection_onto_n_index` |
@@ -91,6 +92,14 @@ in JAMMA by
   The golden-section bound for 20 steps (3.1e-5 in log λ) is above the
   `lambda_rtol` of 2e-5, so interior accuracy at that tolerance comes from the
   refinement, not from golden section alone.
+* **NUMERICAL_EQUIVALENCE_BOUND §2, assumption 4.** The bound routes eigenvector
+  error `‖ΔU‖ ≲ ε‖K‖/gap(K)` into λ and the test statistics. Pab row 0 and
+  `log|H|` depend on the eigendecomposition only through `H = λK + I`
+  (`Invariance`), and `H ⪰ I` keeps `H⁻¹` well conditioned, so only the
+  backward error `‖E‖` reaches them (`EigenPerturbation`). A small eigengap does
+  not enter. LAPACK's backward stability itself is assumed. The eigenvectors
+  must also be orthogonal to working precision; `rotatedInv_sub_inv` gives the
+  exact extra term when they are not, without a norm bound.
 * **NUMERICAL_EQUIVALENCE_BOUND §3** states `|λ̂ − λ*| ≤ τ_opt` in λ; the
   optimizer works in log λ, so the bound is relative: `e^τ − 1`.
 

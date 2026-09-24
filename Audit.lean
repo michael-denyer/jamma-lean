@@ -66,6 +66,18 @@ import JammaLean
 #print axioms JammaLean.pab_eq_projP
 #print axioms JammaLean.remlLogLPab_eq
 #print axioms JammaLean.remlLogLPab_eq_contrast
+#print axioms JammaLean.pab_congr_of_inner
+#print axioms JammaLean.inner_rotated_eq
+#print axioms JammaLean.pab_rotated_eq
+#print axioms JammaLean.pab_rotated_embedCols_eq
+#print axioms JammaLean.logdet_rotated_eq
+#print axioms JammaLean.signFlip_eigen
+#print axioms JammaLean.pab_signFlip_eq
+#print axioms JammaLean.logdet_signFlip_eq
+#print axioms JammaLean.kinship_submatrix
+#print axioms JammaLean.kinship_select_after_centre
+#print axioms JammaLean.kinship_eq_sum_blocks
+#print axioms JammaLean.kinship_eq_append
 
 -- `abIndex` is computable: the packed slots for n_cvt = 1 (cols = 3), in the
 -- order `build_index_table` walks them.

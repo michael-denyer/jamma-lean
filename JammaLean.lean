@@ -13,3 +13,4 @@ import JammaLean.FpSum
 import JammaLean.Optimizer
 import JammaLean.FpSumTree
 import JammaLean.Reml
+import JammaLean.Invariance

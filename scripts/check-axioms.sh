@@ -5,9 +5,11 @@
 # errors instead of printing).
 set -euo pipefail
 
-out=$(lake env lean Audit.lean 2>&1) || { echo "$out"; exit 1; }
+out=$(lake env lean "${1:-Audit.lean}" 2>&1) || { echo "$out"; exit 1; }
+# Lean wraps a long axiom list onto indented continuation lines; rejoin them.
+out=$(awk 'NR > 1 && /^ / { printf "%s", $0; next } NR > 1 { print "" } { printf "%s", $0 } END { print "" }' <<<"$out")
 
-expected=$(grep -c '^#print axioms' Audit.lean)
+expected=$(grep -c "^#print axioms" "${1:-Audit.lean}")
 reported=$(grep -c 'depends on axioms\|does not depend on any axioms' <<<"$out" || true)
 if [ "$reported" -ne "$expected" ]; then
   echo "$out"

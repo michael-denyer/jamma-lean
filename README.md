@@ -41,6 +41,9 @@ mutation of the production formula.
 | **§4** the C mantissa-product logdet equals the log sum | `Logdet.logdetKernel_eq_sum_log`, with the bit split proved in `FrexpBits.frexpBits_hsplit` | `test_native_likelihoods_match_dense_logdet_and_projector` |
 | **§4** Pab recursion; `get_ab_index` transcribes `GetabIndex` | `Pab.pab_succ`, `AbIndex.abIndex_image`, `abIndex_comm` | `test_ab_index_is_a_symmetric_bijection_onto_n_index` |
 | **§4 / NUMERICAL_EQUIVALENCE_BOUND** Pab is `aᵀPb` with `P = H⁻¹ − H⁻¹W(WᵀH⁻¹W)⁻¹WᵀH⁻¹` | `ClosedForm.pab_rotated_eq_closedForm`, `Reml.pab_eq_projP` | `test_calc_pab_equals_dense_projector_at_every_level` |
+| **§4** recursive divisions amplify error when `Pab[p-1,(p,p)]` is small | `Degeneracy.calcPabStep_perturb_ww` (exact pivot sensitivity `aw·bw·d/(ww(ww+d))`), `pab_step_perturb_le` (amplification `√(aa·bb)/ww`) | |
+| **GEMMA_DIVERGENCES** degenerate SNPs: `P_xx ≤ 0` ⇒ NaN | `Degeneracy.pab_self_le_zero_iff` (`P_xx ≤ 0` exactly when x is in the covariate span), `pab_smul_intercept_eq_zero` (constant genotype with an intercept) | |
+| Positive pivots ⇔ full-rank covariates (discharges the pivot hypotheses) | `Degeneracy.pivots_pos_iff_linearIndependent`, `logdet_hiw_eq_of_linearIndependent`, `pab_eq_closedForm_of_linearIndependent` | |
 | **§4** Pab row-0 error `O(n·ε)`, any summation order | `FpSumTree.fwdot_err_le_fpGamma`, `fwdot_err_float64` (≤ 2.221e-11·Σ\|hᵢaᵢbᵢ\| for n ≤ 2·10⁵) | |
 | **§4** REML log-likelihood | `Reml.remlLogL_eq_contrast`, `contrastLogL_at_argmax`, `remlLogLPab_eq_contrast` (JAMMA's formula is the profiled likelihood of the error contrasts `Aᵀy`) | |
 | **§4** the `logdet_hiw` term is `log\|WᵀH⁻¹W\| − log\|WᵀW\|` | `GramDet.logdet_hiw_eq`, `prod_pab_diag_eq_det_gram`, `Reml.det_contrast` | |
@@ -84,9 +87,10 @@ The proofs back the documented claims, with these qualifications:
 
 * The F and χ² distribution functions (`betainc`, `chi2_sf`). Mathlib has no
   regularised incomplete beta function.
-* Floating-point error beyond single sums and dot products: the Pab recursion's
-  divisions, the eigendecomposition (backward stability of LAPACK) and the
-  optimizer under rounding.
+* Floating-point error beyond single sums and dot products: rounding inside the
+  Pab recursion (`Degeneracy` bounds one step's sensitivity to a given input
+  error, not the accumulated rounding), the eigendecomposition (backward
+  stability of LAPACK) and the optimizer under rounding.
 * Uniqueness of the REML optimum. `NUMERICAL_EQUIVALENCE_BOUND` assumes
   concavity in log λ; that is an assumption, not a theorem.
 

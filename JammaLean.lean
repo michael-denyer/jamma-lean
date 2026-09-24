@@ -17,3 +17,4 @@ import JammaLean.Invariance
 import JammaLean.Degeneracy
 import JammaLean.PValues
 import JammaLean.EigenPerturbation
+import JammaLean.NewtonSmooth

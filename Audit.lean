@@ -177,3 +177,11 @@ import JammaLean
 #print axioms JammaLean.rotated_quad_eq
 #print axioms JammaLean.hMat_mul_rotatedInv
 #print axioms JammaLean.rotatedInv_sub_inv
+#print axioms JammaLean.WellCond.step_error
+#print axioms JammaLean.WellCond.newton_exact_error
+#print axioms JammaLean.WellCond.curv_error
+#print axioms JammaLean.WellCond.cand_error
+#print axioms JammaLean.WellCond.accepts_of_wellCond
+#print axioms JammaLean.WellCond.newtonLoop_le
+#print axioms JammaLean.WellCond.newtonLoop_contracts
+#print axioms JammaLean.ceScore_not_wellCond

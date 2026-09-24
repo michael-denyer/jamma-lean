@@ -52,6 +52,7 @@ mutation of the production formula.
 | **`_logl_const`** is the Gaussian likelihood maximised over σ² | `Profile.gaussLogL_le_profiled`, `gaussLogL_at_argmax`, `gaussLogL_argmax_unique` | `test_profiled_logl_is_the_gaussian_maximum_over_sigma2` |
 | **§5** grid then golden section brackets the optimum | `Optimizer.grid_bracket_mem`, `gs_iterate_inv`, `gs_iterate_width`, `golden_error_code` (≤ 3.12e-5 in log λ after 20 steps) | |
 | **§5** safeguarded Newton refinement | `Optimizer.newtonLoop_mem`, `lambdaSearch_error`, `newtonLoop_affine`; limit shown by `refine_can_leave_golden_bracket` | |
+| **§5** Newton refinement converges on a smooth, well-conditioned peak (`−L ≤ s' ≤ −m < 0`, `s'` M-Lipschitz, `L·M·(δ + e) < m²`) | `NewtonSmooth.WellCond.cand_error` (`\|cand − r\| ≤ M(δ + e)/m · e`), `accepts_of_wellCond`, `newtonLoop_contracts`, `curv_error` (`≤ Mδ`), `newton_exact_error`; the counterexample fails the condition: `ceScore_not_wellCond` | |
 | **§6** Wald: `Px_yy = P_yy − P_xy²/P_xx`, `F = β²/SE²` | `Stats.px_yy_eq`, `waldF_eq_beta_sq_div_var`, `waldF_eq_r2`, `waldF_nonneg` | `test_wald_statistics_satisfy_the_r2_identities` |
 | **§6** p-value complement `f/(df+f) = 1 − df/(df+f)` | `Stats.complement_z` | |
 | **§6** `betainc(df/2, 1/2, df/(df+F))` is the F(1,df) upper tail | `PValues.fTail_eq_incBeta`, `fTail_zero` (the density integrates to 1, so `F ≤ 0 ⇒ p = 1` is the right limit) | |
@@ -86,7 +87,13 @@ in JAMMA by
   leaving it is what recovers them. Restricting it raised the worst relative λ
   error from 1.8e-11 to 1.1e-3 (measured on JAMMA `8c534ed6`, C path). Smooth,
   near-quadratic peaks converge (`newtonLoop_affine`), and on mouse_hs1940
-  (10,768 SNPs × 4 configurations) no step left the golden bracket.
+  (10,768 SNPs × 4 configurations) no step left the golden bracket. More
+  generally, on a smooth peak with `−L ≤ s' ≤ −m < 0` and `s'` M-Lipschitz, the
+  code's finite-difference step is accepted and contracts,
+  `|cand − r| ≤ M(δ + e)/m · e < e`, whenever `L·M·(δ + e) < m²`
+  (`accepts_of_wellCond`, `newtonLoop_contracts`); the counterexample violates
+  that condition (`ceScore_not_wellCond`). This is exact arithmetic: the
+  rounding floor, score error divided by `|curvature|`, is not modelled.
 * **§3 wording.** `GEMMA_EQUIVALENCE.md` §3 says `U'y`, `U'W`, `U'x` are
   invariant to sign flips. They are not: a flip negates the matching component.
   Every Pab entry and `logdet_h` are invariant (`Invariance.pab_signFlip_eq`),

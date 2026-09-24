@@ -53,3 +53,19 @@ import JammaLean
 -- order `build_index_table` walks them.
 #eval (List.range 3).flatMap fun k => (List.range' k (3 - k)).map fun j =>
   (k + 1, j + 1, JammaLean.abIndex 3 (k + 1) (j + 1))
+#print axioms JammaLean.grid_bracket_mem
+#print axioms JammaLean.gsStepC_eq
+#print axioms JammaLean.gs_iterate_inv
+#print axioms JammaLean.gs_iterate_width
+#print axioms JammaLean.golden_error
+#print axioms JammaLean.grid_golden_error
+#print axioms JammaLean.golden_error_code
+#print axioms JammaLean.probes_mem
+#print axioms JammaLean.newtonLoop_mem
+#print axioms JammaLean.lambdaSearch_error
+#print axioms JammaLean.lambdaSearch_error_of_not_interior
+#print axioms JammaLean.refine_error_code
+#print axioms JammaLean.newton_step_toward_root
+#print axioms JammaLean.accepted_closer_of_same_side
+#print axioms JammaLean.newtonLoop_affine
+#print axioms JammaLean.refine_can_leave_golden_bracket

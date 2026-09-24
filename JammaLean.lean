@@ -10,3 +10,4 @@ import JammaLean.FrexpBits
 import JammaLean.GramDet
 import JammaLean.ClosedForm
 import JammaLean.FpSum
+import JammaLean.FpSumTree

@@ -63,3 +63,15 @@ import JammaLean
 #print axioms JammaLean.fwdot_err_le_fpGamma_of_nonneg
 #print axioms JammaLean.fpGamma_float64_kinship
 #print axioms JammaLean.fpGamma_float64_pab
+#print axioms JammaLean.STree.err_le_pow
+#print axioms JammaLean.STree.err_le_fpGamma
+#print axioms JammaLean.STree.err_le_fpGamma_length
+#print axioms JammaLean.STree.depth_lt_length
+#print axioms JammaLean.STree.fdot_err_le_fpGamma
+#print axioms JammaLean.STree.fkin_err_le_fpGamma
+#print axioms JammaLean.STree.fwdot_err_le_fpGamma
+#print axioms JammaLean.STree.fkin_err_float64
+#print axioms JammaLean.STree.fwdot_err_float64
+#print axioms JammaLean.STree.sum_abs_mul_le_norm
+#print axioms JammaLean.STree.fdot_err_le_fpGamma_norm
+#print axioms JammaLean.two_impl_le

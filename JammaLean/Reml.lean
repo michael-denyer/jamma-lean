@@ -239,4 +239,81 @@ theorem contrastLogL_at_argmax [Nonempty d] (hH : H.PosDef)
 
 end Likelihood
 
+section Centring
+
+variable (n) in
+/-- The centring matrix `Pc = I - (1/n) 11ᵀ`; `Kc = Pc K Pc` is the centred kinship. -/
+noncomputable def centering : Matrix n n ℝ :=
+  1 - (Fintype.card n : ℝ)⁻¹ • Matrix.of fun _ _ => (1 : ℝ)
+
+variable (W : Matrix n c ℝ) (A : Matrix n d ℝ)
+
+omit [DecidableEq n] [Fintype d] [DecidableEq d] [DecidableEq c] in
+/-- With an intercept in `W`, every contrast column sums to zero. -/
+theorem contrast_col_sum (hAW : Aᵀ * W = 0) (hone : ∃ v, W *ᵥ v = fun _ => 1) (j : d) :
+    ∑ k, A k j = 0 := by
+  obtain ⟨v, hv⟩ := hone
+  have h : Aᵀ *ᵥ (W *ᵥ v) = 0 := by rw [mulVec_mulVec, hAW, zero_mulVec]
+  have := congrFun h j
+  rw [hv] at this
+  simpa [mulVec, dotProduct] using this
+
+omit [Fintype d] [DecidableEq d] [DecidableEq c] in
+theorem transpose_mul_centering (hAW : Aᵀ * W = 0) (hone : ∃ v, W *ᵥ v = fun _ => 1) :
+    Aᵀ * centering n = Aᵀ := by
+  have h0 : Aᵀ * Matrix.of (fun _ _ : n => (1 : ℝ)) = 0 := by
+    ext i j
+    simpa [mul_apply] using contrast_col_sum W A hAW hone i
+  rw [centering, Matrix.mul_sub, Matrix.mul_one, Matrix.mul_smul, h0, smul_zero, sub_zero]
+
+omit [Fintype d] [DecidableEq d] [DecidableEq c] in
+theorem centering_mul (hAW : Aᵀ * W = 0) (hone : ∃ v, W *ᵥ v = fun _ => 1) :
+    centering n * A = A := by
+  have h0 : Matrix.of (fun _ _ : n => (1 : ℝ)) * A = 0 := by
+    ext i j
+    simpa [mul_apply] using contrast_col_sum W A hAW hone j
+  rw [centering, Matrix.sub_mul, Matrix.one_mul, Matrix.smul_mul, h0, smul_zero, sub_zero]
+
+omit [Fintype d] [DecidableEq d] [DecidableEq c] in
+/-- **Centring is invisible to the contrasts.** With an intercept among the covariates,
+`Aᵀ Kc A = Aᵀ K A`. -/
+theorem contrast_centered_kinship (hAW : Aᵀ * W = 0) (hone : ∃ v, W *ᵥ v = fun _ => 1)
+    (K : Matrix n n ℝ) :
+    Aᵀ * (centering n * K * centering n) * A = Aᵀ * K * A := by
+  calc Aᵀ * (centering n * K * centering n) * A
+      = (Aᵀ * centering n) * K * (centering n * A) := by simp only [Matrix.mul_assoc]
+    _ = Aᵀ * K * A := by rw [transpose_mul_centering W A hAW hone, centering_mul W A hAW hone]
+
+omit [Fintype d] [DecidableEq d] [DecidableEq c] in
+/-- ... hence `Aᵀ H_c A = Aᵀ H A` for `H = λK + I` and every `λ`. -/
+theorem contrast_centered_hMat (hAW : Aᵀ * W = 0) (hone : ∃ v, W *ᵥ v = fun _ => 1)
+    (K : Matrix n n ℝ) (lam : ℝ) :
+    Aᵀ * (lam • (centering n * K * centering n) + 1) * A = Aᵀ * (lam • K + 1) * A := by
+  simp only [Matrix.mul_add, Matrix.add_mul, Matrix.mul_smul, Matrix.smul_mul,
+    Matrix.mul_one]
+  rw [contrast_centered_kinship W A hAW hone]
+
+omit [DecidableEq c] in
+/-- The contrast likelihood is identical for `K` and `Kc`, at every `λ` and `s`. -/
+theorem contrastLogL_centered (hAW : Aᵀ * W = 0) (hone : ∃ v, W *ᵥ v = fun _ => 1)
+    (K : Matrix n n ℝ) (lam : ℝ) (y : n → ℝ) (s : ℝ) :
+    contrastLogL (Aᵀ * (lam • (centering n * K * centering n) + 1) * A) (Aᵀ *ᵥ y) s =
+      contrastLogL (Aᵀ * (lam • K + 1) * A) (Aᵀ *ᵥ y) s := by
+  rw [contrast_centered_hMat W A hAW hone]
+
+/-- **JAMMA's REML is invariant to centring the kinship** when an intercept is present:
+`_reml_logl` computed from `H_c = λ Kc + I` equals the one from `H = λ K + I`, at every
+`λ` where both are positive definite. -/
+theorem remlLogL_centered (hW : Function.Injective W.mulVec) (hA : Aᵀ * A = 1)
+    (hAW : Aᵀ * W = 0) (hcard : Fintype.card n = Fintype.card d + Fintype.card c)
+    (hone : ∃ v, W *ᵥ v = fun _ => 1) (K : Matrix n n ℝ) (lam : ℝ)
+    (hH : (lam • K + 1).PosDef) (hHc : (lam • (centering n * K * centering n) + 1).PosDef)
+    (y : n → ℝ) :
+    remlLogL (Fintype.card d) (lam • (centering n * K * centering n) + 1) W y =
+      remlLogL (Fintype.card d) (lam • K + 1) W y := by
+  rw [remlLogL_eq_contrast _ W A hHc hW hA hAW hcard, remlLogL_eq_contrast _ W A hH hW hA hAW hcard,
+    contrast_centered_hMat W A hAW hone]
+
+end Centring
+
 end JammaLean

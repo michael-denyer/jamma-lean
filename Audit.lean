@@ -31,6 +31,9 @@ import JammaLean
 #print axioms JammaLean.remlLogL_eq_contrast
 #print axioms JammaLean.contrastLogL_le_remlLogL
 #print axioms JammaLean.contrastLogL_at_argmax
+#print axioms JammaLean.contrast_centered_kinship
+#print axioms JammaLean.contrastLogL_centered
+#print axioms JammaLean.remlLogL_centered
 
 -- `abIndex` is computable: the packed slots for n_cvt = 1 (cols = 3), in the
 -- order `build_index_table` walks them.

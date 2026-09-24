@@ -76,13 +76,17 @@ in JAMMA by
   `−½ log|WᵀH⁻¹W|`. JAMMA computes `−½ (log|WᵀH⁻¹W| − log|WᵀW|)`, which is the
   form proved equal to the error-contrast likelihood (`Reml.remlLogL_eq_contrast`).
 * **Newton refinement.** The accept rule keeps the result inside the coarse
-  grid bracket (`newtonLoop_mem`), but not inside the final golden-section
-  bracket: `refine_can_leave_golden_bracket` is a concave objective with a
+  grid bracket (`newtonLoop_mem`), not inside the final golden-section bracket.
+  `refine_can_leave_golden_bracket` is a concave objective with a
   piecewise-linear score where one accepted step moves the result from 0.005
-  to 0.495 from the peak. The guaranteed worst case after refinement is
-  therefore the grid spacing (2h ≈ 0.94 in log λ), not φ²⁰·h. Smooth,
-  near-quadratic peaks converge (`newtonLoop_affine`), and JAMMA's committed
-  reference roots check real data.
+  to 0.495 from the peak, so the guaranteed worst case after refinement is the
+  grid spacing (2h ≈ 0.94 in log λ), not φ²⁰·h. Bounding the step by the golden
+  bracket is not the remedy. Under rounding the golden bracket misses the true
+  root on 5 of 8 of JAMMA's 80-digit reference peaks, and the Newton step
+  leaving it is what recovers them. Restricting it raised the worst relative λ
+  error from 1.8e-11 to 1.1e-3 (measured on JAMMA `8c534ed6`, C path). Smooth,
+  near-quadratic peaks converge (`newtonLoop_affine`), and on mouse_hs1940
+  (10,768 SNPs × 4 configurations) no step left the golden bracket.
 * **§3 wording.** `GEMMA_EQUIVALENCE.md` §3 says `U'y`, `U'W`, `U'x` are
   invariant to sign flips. They are not: a flip negates the matching component.
   Every Pab entry and `logdet_h` are invariant (`Invariance.pab_signFlip_eq`),

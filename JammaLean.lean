@@ -4,3 +4,5 @@ import JammaLean.Rotation
 import JammaLean.Stats
 import JammaLean.Profile
 import JammaLean.Logdet
+import JammaLean.Kinship
+import JammaLean.Lrt

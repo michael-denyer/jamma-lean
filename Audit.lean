@@ -24,6 +24,15 @@ import JammaLean
 #print axioms JammaLean.gaussLogL_at_argmax
 #print axioms JammaLean.gaussLogL_argmax_unique
 #print axioms JammaLean.logdetKernel_eq_sum_log
+#print axioms JammaLean.kinship_posSemidef
+#print axioms JammaLean.eigen_nonneg
+#print axioms JammaLean.hpos_of_kinship
+#print axioms JammaLean.logdet_hMat_kinship
+#print axioms JammaLean.pab_row0_eq_dense_kinship
+#print axioms JammaLean.kinship_mulVec_one
+#print axioms JammaLean.mleLogL_H0_le_H1
+#print axioms JammaLean.lrt_nonneg
+#print axioms JammaLean.lrt_stat_nonneg
 
 -- `abIndex` is computable: the packed slots for n_cvt = 1 (cols = 3), in the
 -- order `build_index_table` walks them.

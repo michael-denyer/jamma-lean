@@ -30,12 +30,10 @@ fused multiply-add, or extended-precision accumulators. For IEEE-754 float64
 with round-to-nearest, `u = 2^-53`; `docs/` writes `ε = 2^-52` ("machine
 epsilon"), so `u = ε / 2`. The numeric corollaries below use `u = 2^-53`.
 
-The summation theorems cover **recursive (left-to-right) summation** only.
+The summation theorems here cover **recursive (left-to-right) summation**.
 Blocked `dsyrk`, 10,000-SNP batching, and pairwise or SIMD-lane summation
-compute a different tree. Higham §4.2 shows every summation order satisfies
-the same `γ_{n-1}` bound, but that general statement is not proved here. A
-reordering of the terms of a recursive sum is covered, since `∑ |x i|` does not
-depend on the order.
+compute a different tree; `FpSumTree.lean` proves the same bounds for every
+summation tree (Higham §4.2).
 
 ## Results
 

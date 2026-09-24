@@ -1,67 +1,89 @@
 # jamma-lean
 
-Machine-checked proofs, in Lean 4 with Mathlib, of the exact-arithmetic
-identities that [JAMMA](https://github.com/michael-denyer/jamma)'s linear mixed
-model implements. Every theorem is stated over ℝ. Floating-point rounding is out
-of scope: these proofs show the formulas are right, not that their `float64`
-evaluation stays within JAMMA's tolerances.
+Machine-checked proofs, in Lean 4 with Mathlib, of the mathematical claims in
+[JAMMA](https://github.com/michael-denyer/jamma)'s documentation. JAMMA already
+demonstrates these claims empirically against GEMMA and a dense oracle on many
+datasets. The proofs add a second, independent line of evidence: the formulas
+are correct for every input, not only the ones tested.
+
+Most theorems are stated over ℝ (exact arithmetic). `FpSum` and `FpSumTree`
+prove floating-point error bounds in the standard rounding model, and
+`FrexpBits` works at the level of IEEE-754 bit patterns.
 
 ## Quick start
 
 ```bash
 lake exe cache get
 lake build
-lake env lean Audit.lean
+scripts/check-axioms.sh
 ```
 
-`Audit.lean` prints the axioms behind each headline theorem. Every line must
-list only `propext`, `Classical.choice` and `Quot.sound`; `sorryAx` would mean
-an unfinished proof.
+`scripts/check-axioms.sh` runs `Audit.lean` and fails unless every audited
+theorem depends only on Lean's standard axioms (`propext`, `Classical.choice`,
+`Quot.sound`). An unfinished proof would show `sorryAx`. CI runs the same gate
+on every push.
 
-## What is proved
+## Claims and the evidence behind them
 
-| Code (JAMMA `src/jamma/`) | Lean theorem | Statement |
+The claim column cites JAMMA's docs. "Test" names the case in JAMMA's
+`tests/test_lean_proven_identities.py` that checks the real code against the
+theorem numerically; each of those tests was confirmed to fail under a planted
+mutation of the production formula.
+
+| JAMMA claim | Lean theorem | Test |
 |---|---|---|
-| `lmm/pab.py` `get_ab_index`, `core/constants.py` `n_index` | `AbIndex.abIndex_image`, `abIndex_comm`, `n_index_eq` | The packing maps the `cols(cols+1)/2` unordered pairs bijectively onto `0 … n_index-1`, and is symmetric |
-| `lmm/pab.py` `calc_pab`, rows `1 … n_cvt+1` | `Pab.pab_succ` | `Pab[p] = Pab[p-1] - Pab[p-1,aw]·Pab[p-1,bw] / Pab[p-1,ww]`, including the `ps_ww == 0` branch (Lean's `x / 0 = 0`) |
-| `calc_pab` meaning | `Pab.resid_spec`, `resid_unique`, `pab_eq_inner_resid_left` | Level `p` is the inner product after orthogonal projection off `span{w₁ … w_p}`; the result depends only on that span |
-| `guard_p_yy` | `Pab.pab_self_nonneg` | Every exact `P_aa ≥ 0`, so a negative `P_yy` is numerical breakdown |
-| `compute_Uab` and row 0 of `calc_pab` | `Rotation.pab_row0_eq_dense`, `quad_form_rotated`, `hMat_inv` | `Σ Hi_eval · (Uᵀa)(Uᵀb) = aᵀ(λK + I)⁻¹b` for `K = U diag(ev) Uᵀ`, `U` orthogonal |
-| `likelihood_numpy.py` `logdet_h` | `Rotation.logdet_hMat`, `det_hMat` | `Σ log(λ·ev + 1) = log det(λK + I)` |
-| `lmm/_lmm_logdet.h` `logdet_h_lambda` | `Logdet.logdetKernel_eq_sum_log` | The four-lane mantissa product with renormalisation and a single `log` equals `Σ log vᵢ`, for any split `v = m·2^e` with `m > 0` |
-| `likelihood_numpy.py` `_logl_const` with `- ½ m log P_yy` | `Profile.gaussLogL_le_profiled`, `gaussLogL_at_argmax`, `gaussLogL_argmax_unique` | The profiled form is the Gaussian log-likelihood maximised over σ², reached only at `σ² = P_yy / m` |
-| `stats.py` `Px_YY` | `Stats.px_yy_eq` | `Px_YY = P_YY - P_XY² / P_XX` |
-| `stats.py` Wald | `Stats.waldF_eq_beta_sq_div_var`, `waldF_eq_r2`, `waldF_nonneg` | `F = β² / Var(β) = df·r² / (1 - r²) ≥ 0` |
-| `stats.py` Score | `Stats.scoreF_eq_r2`, `scoreF_le_n` | `F = n·r² ≤ n` |
-| `stats.py` `_f_to_pvalue` | `Stats.complement_z` | `f / (df + f) = 1 - df / (df + f)` exactly |
+| **GEMMA_EQUIVALENCE §2** `K = (1/p) Xc Xcᵀ` is PSD; centred columns put `1` in its kernel | `Kinship.kinship_posSemidef`, `kinship_mulVec_one`, `eigen_nonneg`, `hpos_of_kinship` | `test_centered_kinship_is_psd_with_zero_row_sums` |
+| **§2 / Summary** kinship error `O(p·ε)`, in any BLAS summation order | `FpSumTree.fkin_err_le_fpGamma`, `fkin_err_float64` (≤ 1.111e-10·(1/p)Σ\|xᵢyᵢ\| for p ≤ 10⁶) | |
+| **§3** results do not depend on the eigenvector signs | `Rotation.pab_row0_eq_dense` (row 0 is `aᵀH⁻¹b` for any orthogonal eigenbasis) | |
+| **§4** `log\|H\| = Σ log(λ dᵢ + 1)` | `Rotation.logdet_hMat`, `det_hMat` | `test_numpy_logdet_h_equals_slogdet` |
+| **§4** the C mantissa-product logdet equals the log sum | `Logdet.logdetKernel_eq_sum_log`, with the bit split proved in `FrexpBits.frexpBits_hsplit` | `test_native_likelihoods_match_dense_logdet_and_projector` |
+| **§4** Pab recursion; `get_ab_index` transcribes `GetabIndex` | `Pab.pab_succ`, `AbIndex.abIndex_image`, `abIndex_comm` | `test_ab_index_is_a_symmetric_bijection_onto_n_index` |
+| **§4 / NUMERICAL_EQUIVALENCE_BOUND** Pab is `aᵀPb` with `P = H⁻¹ − H⁻¹W(WᵀH⁻¹W)⁻¹WᵀH⁻¹` | `ClosedForm.pab_rotated_eq_closedForm`, `Reml.pab_eq_projP` | `test_calc_pab_equals_dense_projector_at_every_level` |
+| **§4** Pab row-0 error `O(n·ε)`, any summation order | `FpSumTree.fwdot_err_le_fpGamma`, `fwdot_err_float64` (≤ 2.221e-11·Σ\|hᵢaᵢbᵢ\| for n ≤ 2·10⁵) | |
+| **§4** REML log-likelihood | `Reml.remlLogL_eq_contrast`, `contrastLogL_at_argmax`, `remlLogLPab_eq_contrast` (JAMMA's formula is the profiled likelihood of the error contrasts `Aᵀy`) | |
+| **§4** the `logdet_hiw` term is `log\|WᵀH⁻¹W\| − log\|WᵀW\|` | `GramDet.logdet_hiw_eq`, `prod_pab_diag_eq_det_gram`, `Reml.det_contrast` | |
+| **MATHEMATICAL_VALIDATION** REML invariant to centring K (MLE is not) | `Reml.remlLogL_centering_invariant` | `test_reml_is_invariant_to_centring_kinship_and_mle_is_not` |
+| **`_logl_const`** is the Gaussian likelihood maximised over σ² | `Profile.gaussLogL_le_profiled`, `gaussLogL_at_argmax`, `gaussLogL_argmax_unique` | `test_profiled_logl_is_the_gaussian_maximum_over_sigma2` |
+| **§5** grid then golden section brackets the optimum | `Optimizer.grid_bracket_mem`, `gs_iterate_inv`, `gs_iterate_width`, `golden_error_code` (≤ 3.12e-5 in log λ after 20 steps) | |
+| **§5** safeguarded Newton refinement | `Optimizer.newtonLoop_mem`, `lambdaSearch_error`, `newtonLoop_affine`; limit shown by `refine_can_leave_golden_bracket` | |
+| **§6** Wald: `Px_yy = P_yy − P_xy²/P_xx`, `F = β²/SE²` | `Stats.px_yy_eq`, `waldF_eq_beta_sq_div_var`, `waldF_eq_r2`, `waldF_nonneg` | `test_wald_statistics_satisfy_the_r2_identities` |
+| **§6** p-value complement `f/(df+f) = 1 − df/(df+f)` | `Stats.complement_z` | |
+| **§7** Score `F = n P_xy²/(P_yy P_xx)` | `Stats.scoreF_eq_r2`, `scoreF_le_n` | `test_score_f_is_n_r2_and_at_most_n`, `test_native_score_f_is_n_r2` |
+| **§8** the exact LRT statistic is non-negative | `Lrt.lrt_stat_nonneg`, `mleLogL_H0_le_H1` | `test_mle_with_genotype_never_below_null_at_shared_lambda` |
 
-`r² = P_XY² / (P_XX·P_YY)` is the projected squared correlation of genotype and
-phenotype.
+## Findings
 
-## Not proved yet
+The proofs back the documented claims, with these qualifications:
 
-* `logdet_hiw`, the REML `Σ log Pab[i, ii] - Σ log Iab[i, ii]` term, as
-  `log det(WᵀH⁻¹W) - log det(WᵀW)`. This is the Gram determinant as a product of
-  Gram–Schmidt squared norms.
-* The closed form `P = H⁻¹ - H⁻¹W(WᵀH⁻¹W)⁻¹WᵀH⁻¹`. `resid_unique` already pins
-  `Pab` to the `H⁻¹`-orthogonal projection, which is the same operator.
-* REML invariance to centring the kinship matrix.
+* **§4 formula.** `GEMMA_EQUIVALENCE.md` §4 writes the REML term as
+  `−½ log|WᵀH⁻¹W|`. JAMMA computes `−½ (log|WᵀH⁻¹W| − log|WᵀW|)`, which is the
+  form proved equal to the error-contrast likelihood (`Reml.remlLogL_eq_contrast`).
+* **Newton refinement.** The accept rule keeps the result inside the coarse
+  grid bracket (`newtonLoop_mem`), but not inside the final golden-section
+  bracket: `refine_can_leave_golden_bracket` is a concave objective with a
+  piecewise-linear score where one accepted step moves the result from 0.005
+  to 0.495 from the peak. The guaranteed worst case after refinement is
+  therefore the grid spacing (2h ≈ 0.94 in log λ), not φ²⁰·h. Smooth,
+  near-quadratic peaks converge (`newtonLoop_affine`), and JAMMA's committed
+  reference roots check real data.
+* **§5 wording.** The docs say one Newton step; the code takes up to three.
+  The golden-section bound for 20 steps (3.1e-5 in log λ) is above the
+  `lambda_rtol` of 2e-5, so interior accuracy at that tolerance comes from the
+  refinement, not from golden section alone.
+* **NUMERICAL_EQUIVALENCE_BOUND §3** states `|λ̂ − λ*| ≤ τ_opt` in λ; the
+  optimizer works in log λ, so the bound is relative: `e^τ − 1`.
+
+## Not proved
+
 * The F and χ² distribution functions (`betainc`, `chi2_sf`). Mathlib has no
-  regularised incomplete beta.
-* Any floating-point error bound (`docs/GEMMA_NUMERICAL_EQUIVALENCE_BOUND.md`).
+  regularised incomplete beta function.
+* Floating-point error beyond single sums and dot products: the Pab recursion's
+  divisions, the eigendecomposition (backward stability of LAPACK) and the
+  optimizer under rounding.
+* Uniqueness of the REML optimum. `NUMERICAL_EQUIVALENCE_BOUND` assumes
+  concavity in log λ; that is an assumption, not a theorem.
 
 ## Layout
 
-```mermaid
-graph LR
-  AbIndex --> Root[JammaLean]
-  Pab --> Stats --> Root
-  Pab --> Root
-  Rotation --> Root
-  Profile --> Root
-  Logdet --> Root
-  Root --> Audit[Audit.lean]
-```
-
 Each file in `JammaLean/` opens with a module docstring naming the JAMMA
-function it models.
+function it models. `Audit.lean` lists the audited theorems.

@@ -34,7 +34,9 @@ mutation of the production formula.
 |---|---|---|
 | **GEMMA_EQUIVALENCE §2** `K = (1/p) Xc Xcᵀ` is PSD; centred columns put `1` in its kernel | `Kinship.kinship_posSemidef`, `kinship_mulVec_one`, `eigen_nonneg`, `hpos_of_kinship` | `test_centered_kinship_is_psd_with_zero_row_sums` |
 | **§2 / Summary** kinship error `O(p·ε)`, in any BLAS summation order | `FpSumTree.fkin_err_le_fpGamma`, `fkin_err_float64` (≤ 1.111e-10·(1/p)Σ\|xᵢyᵢ\| for p ≤ 10⁶) | |
-| **§3** results do not depend on the eigenvector signs | `Rotation.pab_row0_eq_dense` (row 0 is `aᵀH⁻¹b` for any orthogonal eigenbasis) | |
+| **§2** early row selection gives the principal submatrix of kinship | `Invariance.kinship_submatrix`, `kinship_select_after_centre` | |
+| **§2** SNP batching does not change K | `Invariance.kinship_eq_sum_blocks`, `kinship_eq_append` | |
+| **§3** results do not depend on the eigenvector signs | `Invariance.pab_signFlip_eq`, `logdet_signFlip_eq`; more generally `pab_rotated_eq`, `logdet_rotated_eq` for any orthogonal eigenbasis | |
 | **§4** `log\|H\| = Σ log(λ dᵢ + 1)` | `Rotation.logdet_hMat`, `det_hMat` | `test_numpy_logdet_h_equals_slogdet` |
 | **§4** the C mantissa-product logdet equals the log sum | `Logdet.logdetKernel_eq_sum_log`, with the bit split proved in `FrexpBits.frexpBits_hsplit` | `test_native_likelihoods_match_dense_logdet_and_projector` |
 | **§4** Pab recursion; `get_ab_index` transcribes `GetabIndex` | `Pab.pab_succ`, `AbIndex.abIndex_image`, `abIndex_comm` | `test_ab_index_is_a_symmetric_bijection_onto_n_index` |
@@ -66,6 +68,11 @@ The proofs back the documented claims, with these qualifications:
   therefore the grid spacing (2h ≈ 0.94 in log λ), not φ²⁰·h. Smooth,
   near-quadratic peaks converge (`newtonLoop_affine`), and JAMMA's committed
   reference roots check real data.
+* **§3 wording.** `GEMMA_EQUIVALENCE.md` §3 says `U'y`, `U'W`, `U'x` are
+  invariant to sign flips. They are not: a flip negates the matching component.
+  Every Pab entry and `logdet_h` are invariant (`Invariance.pab_signFlip_eq`),
+  and more generally under any orthogonal eigenbasis, including rotations within
+  a repeated eigenvalue (`pab_rotated_eq`).
 * **§5 wording.** The docs say one Newton step; the code takes up to three.
   The golden-section bound for 20 steps (3.1e-5 in log λ) is above the
   `lambda_rtol` of 2e-5, so interior accuracy at that tolerance comes from the

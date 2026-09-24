@@ -33,6 +33,11 @@ import JammaLean
 #print axioms JammaLean.mleLogL_H0_le_H1
 #print axioms JammaLean.lrt_nonneg
 #print axioms JammaLean.lrt_stat_nonneg
+#print axioms JammaLean.frexpExp_eq
+#print axioms JammaLean.frexpBits_eq
+#print axioms JammaLean.frexpBits_isPosNormal
+#print axioms JammaLean.frexpBits_split
+#print axioms JammaLean.frexpBits_hsplit
 
 -- `abIndex` is computable: the packed slots for n_cvt = 1 (cols = 3), in the
 -- order `build_index_table` walks them.

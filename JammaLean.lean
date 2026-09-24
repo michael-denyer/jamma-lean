@@ -6,3 +6,4 @@ import JammaLean.Profile
 import JammaLean.Logdet
 import JammaLean.Kinship
 import JammaLean.Lrt
+import JammaLean.FrexpBits
